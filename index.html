@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indy Arthouse Calendar</title>
+<style>
+  :root { color-scheme: light; --bg:#faf8f4; --card:#fff; --ink:#1a1a1a; --muted:#6b6255; --line:#e8e2d6;
+          --dh:#b3412c; --dhbg:#fbeae6; --kk:#1e6e46; --kkbg:#e6f2ec; --gold:#9a7b1e; }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; }
+  body { background:var(--bg); color:var(--ink); font:14px/1.4 system-ui,-apple-system,sans-serif; padding:10px 12px 6px; overflow-x:hidden; display:flex; flex-direction:column; }
+  header { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  h1 { font:clamp(17px,2.2vw,23px) Georgia,serif; letter-spacing:.5px; white-space:nowrap; }
+  h1 em { color:var(--dh); font-style:normal; }
+  .sub { color:var(--muted); font-size:11.5px; }
+  .legend { display:inline-flex; gap:12px; font-size:11.5px; color:var(--muted); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+  .controls { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  .controls input[type=search]{ flex:1 1 160px; min-width:120px; padding:5px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); font-size:12.5px; }
+  .chip { padding:4px 11px; border:1px solid var(--line); border-radius:999px; background:var(--card); cursor:pointer; font-size:11.5px; color:var(--muted); user-select:none; white-space:nowrap; }
+  .chip.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .drop { position:relative; }
+  .drop > .chip .n { background:var(--gold); color:#fff; border-radius:8px; padding:0 5px; font-size:10px; margin-left:4px; }
+  .panel { position:absolute; top:110%; left:0; z-index:40; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 34px rgba(0,0,0,.14); width:240px; padding:8px; display:none; }
+  .drop.open .panel { display:block; }
+  .panel input[type=search]{ width:100%; padding:4px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; margin-bottom:6px; }
+  .plist { max-height:min(300px,45vh); overflow-y:auto; scrollbar-width:thin; }
+  .plist label { display:flex; align-items:center; gap:7px; font-size:12.5px; padding:3px 4px; border-radius:5px; cursor:pointer; }
+  .plist label:hover { background:#f3efe6; }
+  .plist label .cnt { margin-left:auto; color:var(--muted); font-size:10.5px; }
+  .plist input { accent-color: var(--ink); }
+  .pfoot { display:flex; justify-content:space-between; margin-top:6px; }
+  .pfoot button { border:none; background:none; font-size:11.5px; color:var(--dh); cursor:pointer; }
+  .mnav { display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .mnav button { border:1px solid var(--line); background:var(--card); border-radius:8px; font-size:15px; width:30px; height:28px; cursor:pointer; color:var(--ink); }
+  .mnav button:disabled { opacity:.3; cursor:default; }
+  .mnav h2 { font:15px Georgia,serif; letter-spacing:1.5px; text-transform:uppercase; min-width:150px; text-align:center; }
+  #liveNote { font-size:11.5px; color:var(--kk); margin:0 0 6px; display:none; }
+  #calwrap { flex:1; min-height:0; display:flex; flex-direction:column; }
+  .dows { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; margin-bottom:3px; }
+  .dow { font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); text-align:center; }
+  .grid { flex:1; min-height:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); grid-auto-rows:minmax(0,1fr); gap:4px; }
+  .day { background:var(--card); border:1px solid var(--line); border-radius:7px; padding:2px 3px 3px; min-width:0; overflow-y:auto; scrollbar-width:thin; }
+  .day.blank { background:transparent; border:none; }
+  .day.today { border-color:var(--ink); box-shadow:0 0 0 1px var(--ink); }
+  .day.hit { border-color:var(--gold); box-shadow:0 0 0 1.5px var(--gold); background:#fffcf2; }
+  .day.hit .dnum { color:var(--gold); font-weight:700; }
+  .day.today.hit { box-shadow:0 0 0 1px var(--ink), 0 0 0 3px var(--gold); }
+  .dnum { font-size:10px; color:var(--muted); margin:1px 2px 2px; }
+  .ev { display:block; width:100%; text-align:left; font-size:10.5px; line-height:1.25; border:none; border-radius:4px; padding:2px 4px; margin-bottom:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .ev.dh { background:var(--dhbg); color:var(--dh); }
+  .ev.kk { background:var(--kkbg); color:var(--kk); }
+  .ev.new { font-weight:700; }
+  .ev .tm { opacity:.75; font-weight:400; font-size:9.5px; }
+  .ev .star { color:var(--gold); }
+  .ev.dim { opacity:.15; }
+  .foot { font-size:10.5px; color:var(--muted); padding:4px 0 2px; }
+  #ovl { position:fixed; inset:0; background:rgba(20,15,5,.45); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  #ovl.open { display:flex; }
+  #modal { background:var(--card); border-radius:14px; max-width:440px; width:100%; max-height:86vh; overflow-y:auto; padding:22px 26px; box-shadow:0 18px 60px rgba(0,0,0,.25); }
+  #modal .mtag { font-size:10px; letter-spacing:1.5px; text-transform:uppercase; }
+  #modal .mtag.dh { color:var(--dh); } #modal .mtag.kk { color:var(--kk); }
+  #modal h3 { font:21px Georgia,serif; margin:4px 0 2px; }
+  #modal .my { color:var(--muted); font-size:13px; margin-bottom:10px; }
+  #modal dl { display:grid; grid-template-columns:76px 1fr; gap:6px 12px; font-size:13px; }
+  #modal dt { color:var(--muted); font-size:10.5px; text-transform:uppercase; letter-spacing:1px; padding-top:2px; }
+  #modal .maward { color:var(--gold); font-weight:600; }
+  #modal .stimes div { margin-bottom:2px; }
+  #modal a.btn { display:inline-block; margin-top:14px; font-size:12.5px; color:#fff; background:var(--ink); padding:6px 15px; border-radius:8px; text-decoration:none; }
+  #modal .close { float:right; border:none; background:none; font-size:20px; cursor:pointer; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Indy <em>Arthouse</em> Calendar</h1>
+  <span class="legend"><span><span class="dot" style="background:var(--dh)"></span>Drafthouse</span><span><span class="dot" style="background:var(--kk)"></span>Kan-Kan</span></span>
+  <span class="sub">click a film for details · ★ major award/festival · updated <span id="upd"></span></span>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search title, director, actor…">
+  <span class="chip fchip" data-f="all">Both</span>
+  <span class="chip fchip" data-f="dh">Drafthouse</span>
+  <span class="chip fchip" data-f="kk">Kan-Kan</span>
+  <span class="chip" id="newOnly">New releases</span>
+  <span class="drop" id="dirDrop"><span class="chip" id="dirBtn">Directors ▾</span>
+    <div class="panel"><input type="search" id="dirQ" placeholder="Find a director…"><div class="plist" id="dirList"></div>
+    <div class="pfoot"><button id="dirClear">Clear</button></div></div></span>
+  <span class="drop" id="awDrop"><span class="chip" id="awBtn">★ Awards ▾</span>
+    <div class="panel"><div class="plist" id="awList"></div>
+    <div class="pfoot"><button id="awClear">Clear</button></div></div></span>
+  <span class="mnav"><button id="prev">‹</button><h2 id="mtitle"></h2><button id="next">›</button></span>
+</div>
+<div id="liveNote"></div>
+<div id="calwrap"><div class="dows" id="dows"></div><div class="grid" id="grid"></div></div>
+<div class="foot">Auto-updated daily · bold = first-run release · standalone file, works in any browser — share a copy with a friend.</div>
+
+<div id="ovl"><div id="modal"></div></div>
+
+<script>
+const UPDATED = "2026-07-23";
+// th: dh|kk · tag: new|rep · y year · d director · c cast · a MAJOR award/festival only (else "") · n note · u link
+// ds: ["YYYY-MM-DD",...] specific dates · r: [from,to] daily-run range
+// st: {"MM-DD":"7:45 PM/10:00 PM"} showtimes per date · tt: "showtime summary" for multi-showing runs
+const FILMS = [
+// ─── DRAFTHOUSE ───
+{th:"dh",tag:"new",t:"The Odyssey",y:2026,d:"Christopher Nolan",c:"Matt Damon, Tom Holland, Anne Hathaway, Zendaya",a:"",n:"Record-setting IMAX opening; also in Spanish dub",u:"https://drafthouse.com/indianapolis",r:["2026-07-23","2026-07-29"],tt:"Many showtimes daily, ~11:00 AM–9:45 PM"},
+{th:"dh",tag:"new",t:"The Invite",y:2026,d:"Olivia Wilde",c:"Seth Rogen, Olivia Wilde, Penélope Cruz, Edward Norton",a:"",n:"Remake of 'The People Upstairs'",u:"https://drafthouse.com/indianapolis",ds:["2026-07-23"],st:{"07-23":"10:00 PM"}},
+{th:"dh",tag:"new",t:"Moana (live action)",y:2026,d:"Thomas Kail",c:"Catherine Laga'aia, Dwayne Johnson",a:"",n:"",u:"https://drafthouse.com/indianapolis",r:["2026-07-23","2026-07-29"],tt:"~6 showtimes daily, 12:15 PM–10:00 PM"},
+{th:"dh",tag:"new",t:"Evil Dead Burn",y:2026,d:"Sébastien Vaniček",c:"Luciane Buchanan, Hunter Doohan, Souheila Yacoub",a:"",n:"",u:"https://drafthouse.com/indianapolis",r:["2026-07-23","2026-07-29"],tt:"1:15, 4:15, 7:15 & 10:15 PM daily"},
+{th:"dh",tag:"new",t:"Toy Story 5",y:2026,d:"Andrew Stanton, Kenna Harris",c:"Tom Hanks, Tim Allen, Joan Cusack, Greta Lee",a:"",n:"",u:"https://drafthouse.com/indianapolis",r:["2026-07-23","2026-07-29"],tt:"~6 showtimes daily, 12:30 PM–9:30 PM"},
+{th:"dh",tag:"new",t:"Minions & Monsters",y:2026,d:"Pierre Coffin",c:"Steve Carell, Pierre Coffin",a:"",n:"",u:"https://drafthouse.com/indianapolis",r:["2026-07-23","2026-07-29"],tt:"5 showtimes daily, 11:00 AM–9:15 PM"},
+{th:"dh",tag:"new",t:"Motor City",y:2026,d:"Potsy Ponciroli",c:"Alan Ritchson, Shailene Woodley, Ben Foster",a:"Venice 2025 (Spotlight, world premiere)",n:"Near-dialogue-free revenge thriller, Jack White soundtrack",u:"https://drafthouse.com/indianapolis",r:["2026-07-23","2026-07-29"],tt:"7:15 & 10:15 PM daily"},
+{th:"dh",tag:"rep",t:"Snake Eyes",y:1998,d:"Brian De Palma",c:"Nicolas Cage, Gary Sinise",a:"",n:"De Palma series",u:"https://drafthouse.com/indianapolis",ds:["2026-07-23"],st:{"07-23":"9:45 PM"}},
+{th:"dh",tag:"new",t:"Sia: Nostalgic for the Present",y:2026,d:"Sia & Daniel Askill",c:"Sia, Maddie Ziegler",a:"",n:"Concert film, 10th-anniversary remaster",u:"https://drafthouse.com/indianapolis",ds:["2026-07-24"],st:{"07-24":"1:00 PM"}},
+{th:"dh",tag:"new",t:"Arco (Kids Camp)",y:2025,d:"Ugo Bienvenu",c:"Produced by Natalie Portman",a:"Cannes 2025 · Annecy Cristal · César · Oscar nom",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-07-24","2026-07-27","2026-07-28"],st:{"07-24":"12:00 PM","07-27":"4:00 PM","07-28":"4:15 PM"}},
+{th:"dh",tag:"rep",t:"The Thing Called Love",y:1993,d:"Peter Bogdanovich",c:"River Phoenix, Samantha Mathis, Sandra Bullock",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-07-25"],st:{"07-25":"12:30 PM"}},
+{th:"dh",tag:"rep",t:"Cinema Paradiso",y:1988,d:"Giuseppe Tornatore",c:"Philippe Noiret, Salvatore Cascio",a:"Oscar Best Foreign Film · Cannes Grand Prix",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-07-25"],st:{"07-25":"3:30 PM"}},
+{th:"dh",tag:"rep",t:"Rashomon",y:1950,d:"Akira Kurosawa",c:"Toshiro Mifune, Machiko Kyō",a:"Venice Golden Lion · Honorary Oscar",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-07-26"],st:{"07-26":"1:00 PM"}},
+{th:"dh",tag:"rep",t:"Magnolia",y:1999,d:"Paul Thomas Anderson",c:"Tom Cruise, Julianne Moore, Philip Seymour Hoffman",a:"Berlin Golden Bear",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-07-26"],st:{"07-26":"3:30 PM"}},
+{th:"dh",tag:"rep",t:"Mystery Voyage (secret screening)",y:0,d:"—",c:"—",a:"",n:"Title revealed at showtime",u:"https://drafthouse.com/indianapolis",ds:["2026-07-27"],st:{"07-27":"7:00 PM"}},
+{th:"dh",tag:"new",t:"WHAM! 10 Days in China",y:2026,d:"Mike Christie",c:"George Michael, Andrew Ridgeley (archive)",a:"",n:"Doc on Wham!'s historic 1985 China tour",u:"https://drafthouse.com/indianapolis",ds:["2026-07-28"],st:{"07-28":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"Casualties of War",y:1989,d:"Brian De Palma",c:"Michael J. Fox, Sean Penn",a:"",n:"De Palma series",u:"https://drafthouse.com/indianapolis",ds:["2026-07-29"],st:{"07-29":"6:45 PM"}},
+{th:"dh",tag:"new",t:"Spider-Man: Brand New Day",y:2026,d:"Destin Daniel Cretton",c:"Tom Holland, Zendaya, Sadie Sink, Mark Ruffalo",a:"",n:"",u:"https://drafthouse.com/indianapolis",r:["2026-07-30","2026-08-12"],tt:"Multiple showtimes daily, ~11:15 AM–10:00 PM"},
+{th:"dh",tag:"rep",t:"I Saw the TV Glow",y:2024,d:"Jane Schoenbrun",c:"Justice Smith, Brigette Lundy-Paine",a:"Sundance 2024 premiere",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-02"],st:{"08-02":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"Paddington 2 (Kids Camp)",y:2017,d:"Paul King",c:"Hugh Grant, Hugh Bonneville, Ben Whishaw",a:"",n:"BAFTA-nominated",u:"https://drafthouse.com/indianapolis",r:["2026-08-03","2026-08-05"],tt:"12:30 PM daily"},
+{th:"dh",tag:"rep",t:"D&D: Honor Among Thieves",y:2023,d:"Goldstein & Daley",c:"Chris Pine, Michelle Rodriguez",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-03"],st:{"08-03":"6:45 PM"}},
+{th:"dh",tag:"rep",t:"Waiting...",y:2005,d:"Rob McKittrick",c:"Ryan Reynolds, Anna Faris",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-03"],st:{"08-03":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"We're All Going to the World's Fair",y:2021,d:"Jane Schoenbrun",c:"Anna Cobb",a:"Sundance 2021 (NEXT)",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-04"],st:{"08-04":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"The Untouchables",y:1987,d:"Brian De Palma",c:"Kevin Costner, Sean Connery, Robert De Niro",a:"Oscar: Best Supporting Actor (Connery)",n:"De Palma series",u:"https://drafthouse.com/indianapolis",ds:["2026-08-05"],st:{"08-05":"7:00 PM"}},
+{th:"dh",tag:"new",t:"Super Troopers 3",y:2026,d:"Jay Chandrasekhar",c:"Broken Lizard, Brian Cox, Chace Crawford",a:"",n:"",u:"https://drafthouse.com/indianapolis",r:["2026-08-06","2026-08-12"],tt:"7:00 & 10:00 PM daily"},
+{th:"dh",tag:"rep",t:"Marcel the Shell with Shoes On",y:2021,d:"Dean Fleischer Camp",c:"Jenny Slate, Isabella Rossellini",a:"Oscar nom: Best Animated Feature",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-07"],st:{"08-07":"12:30 PM"}},
+{th:"dh",tag:"rep",t:"Mikey and Nicky",y:1976,d:"Elaine May",c:"Peter Falk, John Cassavetes",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-08"],st:{"08-08":"6:45 PM"}},
+{th:"dh",tag:"rep",t:"At Midnight I'll Take Your Soul",y:1964,d:"José Mojica Marins",c:"José Mojica Marins",a:"",n:"Landmark Brazilian 'Coffin Joe' horror",u:"https://drafthouse.com/indianapolis",ds:["2026-08-08"],st:{"08-08":"9:45 PM"}},
+{th:"dh",tag:"new",t:"CatVideoFest 2026",y:2026,d:"Will Braden (curator)",c:"Cats",a:"",n:"Proceeds support shelters",u:"https://drafthouse.com/indianapolis",ds:["2026-08-08","2026-08-09","2026-08-11"],st:{"08-08":"4:00 PM","08-09":"12:30 PM","08-11":"6:30 PM"}},
+{th:"dh",tag:"rep",t:"A New Leaf",y:1971,d:"Elaine May",c:"Walter Matthau, Elaine May",a:"",n:"May's directorial debut",u:"https://drafthouse.com/indianapolis",ds:["2026-08-09","2026-08-18"],st:{"08-09":"3:00 PM","08-18":"6:30 PM"}},
+{th:"dh",tag:"rep",t:"Raising Cain",y:1992,d:"Brian De Palma",c:"John Lithgow",a:"",n:"De Palma series",u:"https://drafthouse.com/indianapolis",ds:["2026-08-10"],st:{"08-10":"7:00 PM"}},
+{th:"dh",tag:"new",t:"The End of Oak Street",y:2026,d:"David Robert Mitchell",c:"Anne Hathaway, Ewan McGregor, Maisy Stella",a:"",n:"Produced by J.J. Abrams",u:"https://drafthouse.com/indianapolis",r:["2026-08-13","2026-08-19"],tt:"7:15 & 10:15 PM daily (from 3:45 PM opening day)"},
+{th:"dh",tag:"new",t:"Paw Patrol: The Dino Movie",y:2026,d:"—",c:"—",a:"",n:"",u:"https://drafthouse.com/indianapolis",r:["2026-08-13","2026-08-19"],tt:"11:00 AM, 1:35 & 4:10 PM daily"},
+{th:"dh",tag:"rep",t:"Adaptation.",y:2002,d:"Spike Jonze",c:"Nicolas Cage, Meryl Streep, Chris Cooper",a:"Oscar: Best Supporting Actor (Cooper)",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-13"],st:{"08-13":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"The Piano",y:1993,d:"Jane Campion",c:"Holly Hunter, Harvey Keitel, Anna Paquin",a:"Palme d'Or · 3 Oscars",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-14"],st:{"08-14":"6:30 PM"}},
+{th:"dh",tag:"rep",t:"Being John Malkovich",y:1999,d:"Spike Jonze",c:"John Cusack, Cameron Diaz, Catherine Keener",a:"3 Oscar noms",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-14"],st:{"08-14":"7:15 PM"}},
+{th:"dh",tag:"new",t:"Peter Asher: Everywhere Man",y:2026,d:"Daniel Geller & Dayna Goldfine",c:"Peter Asher",a:"",n:"Music documentary",u:"https://drafthouse.com/indianapolis",ds:["2026-08-15"],st:{"08-15":"3:45 PM"}},
+{th:"dh",tag:"rep",t:"Wet Hot American Summer (25th)",y:2001,d:"David Wain",c:"Janeane Garofalo, Paul Rudd, Amy Poehler, Bradley Cooper",a:"",n:"25th-anniversary screenings",u:"https://drafthouse.com/indianapolis",ds:["2026-08-15","2026-08-17","2026-08-19"],st:{"08-15":"1:00 PM","08-17":"4:00 PM/7:00 PM","08-19":"7:00 PM"}},
+{th:"dh",tag:"new",t:"Six: The Musical Live!",y:2026,d:"—",c:"West End cast",a:"",n:"Filmed Tony-winning stage musical",u:"https://drafthouse.com/indianapolis",ds:["2026-08-15","2026-08-16","2026-08-19"],st:{"08-15":"4:00 PM","08-16":"12:00 PM","08-19":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"Hedwig and the Angry Inch",y:2001,d:"John Cameron Mitchell",c:"John Cameron Mitchell, Miriam Shor",a:"Sundance: Best Director + Audience Award",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-16"],st:{"08-16":"6:00 PM"}},
+{th:"dh",tag:"rep",t:"Phantom of the Paradise",y:1974,d:"Brian De Palma",c:"Paul Williams, William Finley",a:"Oscar nom: score",n:"De Palma series",u:"https://drafthouse.com/indianapolis",ds:["2026-08-16"],st:{"08-16":"3:00 PM"}},
+{th:"dh",tag:"rep",t:"Moonlight",y:2016,d:"Barry Jenkins",c:"Mahershala Ali, Trevante Rhodes, Naomie Harris",a:"Oscar Best Picture",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-20"],st:{"08-20":"7:15 PM"}},
+{th:"dh",tag:"rep",t:"The Fast and the Furious (25th)",y:2001,d:"Rob Cohen",c:"Vin Diesel, Paul Walker",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-21","2026-08-22","2026-08-23"],st:{"08-21":"7:00 PM","08-22":"1:00 PM/4:00 PM","08-23":"12:00 PM"}},
+{th:"dh",tag:"rep",t:"Where Is the Friend's House?",y:1987,d:"Abbas Kiarostami",c:"Babek Ahmadpour",a:"Locarno Bronze Leopard",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-21"],st:{"08-21":"12:30 PM"}},
+{th:"dh",tag:"rep",t:"The Worst Person in the World",y:2021,d:"Joachim Trier",c:"Renate Reinsve, Anders Danielsen Lie",a:"Cannes Best Actress · 2 Oscar noms",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-21"],st:{"08-21":"7:30 PM"}},
+{th:"dh",tag:"rep",t:"De Palma",y:2015,d:"Noah Baumbach & Jake Paltrow",c:"Brian De Palma",a:"Venice 2015",n:"Documentary",u:"https://drafthouse.com/indianapolis",ds:["2026-08-22"],st:{"08-22":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"This Night I'll Possess Your Corpse",y:1967,d:"José Mojica Marins",c:"José Mojica Marins",a:"",n:"Coffin Joe sequel",u:"https://drafthouse.com/indianapolis",ds:["2026-08-22"],st:{"08-22":"9:30 PM"}},
+{th:"dh",tag:"rep",t:"Everything Everywhere All at Once",y:2022,d:"Daniels",c:"Michelle Yeoh, Ke Huy Quan, Jamie Lee Curtis",a:"7 Oscars incl. Best Picture",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-23"],st:{"08-23":"6:00 PM"}},
+{th:"dh",tag:"rep",t:"Grease",y:1978,d:"Randal Kleiser",c:"John Travolta, Olivia Newton-John",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-23"],st:{"08-23":"3:00 PM"}},
+{th:"dh",tag:"new",t:"GHOST: 2 Big To Rig",y:2026,d:"—",c:"Ghost (Tobias Forge)",a:"",n:"Skeletour concert film, shot on 16mm",u:"https://drafthouse.com/indianapolis",ds:["2026-08-26","2026-08-27","2026-08-29"],st:{"08-26":"7:00 PM","08-27":"7:00 PM","08-29":"4:00 PM"}},
+{th:"dh",tag:"new",t:"Coyote Vs. ACME",y:2026,d:"Dave Green",c:"Will Forte, John Cena, Lana Condor",a:"",n:"The famously unshelved WB hybrid comedy",u:"https://drafthouse.com/indianapolis",r:["2026-08-27","2026-09-02"],tt:"12:30, 3:30 & 6:30 PM daily"},
+{th:"dh",tag:"rep",t:"Moonrise Kingdom",y:2012,d:"Wes Anderson",c:"Jared Gilman, Kara Hayward, Bruce Willis",a:"Opened Cannes 2012 · Oscar nom",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-28"],st:{"08-28":"12:30 PM"}},
+{th:"dh",tag:"new",t:"Butthole Surfers: The Hole Truth and Nothing Butt",y:2025,d:"Tom Stern",c:"Gibby Haynes, Dave Grohl, Flea",a:"SXSW 2025",n:"Music documentary",u:"https://drafthouse.com/indianapolis",ds:["2026-08-29","2026-09-01"],st:{"08-29":"1:00 PM","09-01":"7:00 PM"}},
+{th:"dh",tag:"rep",t:"The Outsiders: The Complete Novel",y:1983,d:"Francis Ford Coppola",c:"C. Thomas Howell, Matt Dillon, Rob Lowe, Tom Cruise",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-30"],st:{"08-30":"3:00 PM"}},
+{th:"dh",tag:"rep",t:"Mothra vs. Godzilla",y:1964,d:"Ishirō Honda",c:"Akira Takarada, Yuriko Hoshi",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-08-30"],st:{"08-30":"12:30 PM"}},
+{th:"dh",tag:"rep",t:"Ma & Pa Kettle",y:1949,d:"Charles Lamont",c:"Marjorie Main, Percy Kilbride",a:"",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-09-06"],st:{"09-06":"1:30 PM"}},
+{th:"dh",tag:"rep",t:"Pleasantville",y:1998,d:"Gary Ross",c:"Tobey Maguire, Reese Witherspoon, Joan Allen",a:"3 Oscar noms",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-09-06"],st:{"09-06":"4:00 PM"}},
+{th:"dh",tag:"rep",t:"Cabaret",y:1972,d:"Bob Fosse",c:"Liza Minnelli, Michael York, Joel Grey",a:"8 Oscars incl. Director & Actress",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-09-20"],st:{"09-20":"3:00 PM"}},
+{th:"dh",tag:"rep",t:"Little Shop of Horrors",y:1986,d:"Frank Oz",c:"Rick Moranis, Ellen Greene, Steve Martin",a:"2 Oscar noms",n:"",u:"https://drafthouse.com/indianapolis",ds:["2026-10-25"],st:{"10-25":"3:00 PM"}},
+// ─── KAN-KAN ───
+{th:"kk",tag:"new",t:"The Odyssey",y:2026,d:"Christopher Nolan",c:"Matt Damon, Tom Holland, Anne Hathaway, Zendaya",a:"",n:"Record-setting IMAX opening",u:"https://kankanindy.com/events/theodyssey/",r:["2026-07-23","2026-08-07"],tt:"Multiple showtimes most days — see site"},
+{th:"kk",tag:"rep",t:"Summer of Soul",y:2021,d:"Questlove",c:"Stevie Wonder, Nina Simone, Sly Stone (archive)",a:"Oscar Best Documentary · Sundance Grand Jury",n:"",u:"https://kankanindy.com/events/summerofsoul2021/",ds:["2026-07-23"],st:{"07-23":"7:45 PM"}},
+{th:"kk",tag:"new",t:"The Invite",y:2026,d:"Olivia Wilde",c:"Seth Rogen, Olivia Wilde, Penélope Cruz, Edward Norton",a:"",n:"Remake of 'The People Upstairs'",u:"https://kankanindy.com/events/theinvite/",r:["2026-07-23","2026-07-30"],tt:"Multiple showtimes daily — see site"},
+{th:"kk",tag:"new",t:"Romería",y:2025,d:"Carla Simón",c:"Llúcia Garcia, Mitch Robles, Tristán Ulloa",a:"Cannes 2025 Competition",n:"Spain's Oscar shortlist; Goya nominations",u:"https://kankanindy.com/events/romera/",ds:["2026-07-23"],st:{"07-23":"5:15 PM"}},
+{th:"kk",tag:"rep",t:"Ponyo",y:2008,d:"Hayao Miyazaki",c:"Noah Cyrus, Frankie Jonas (EN voices)",a:"Japan Academy Prize",n:"Studio Ghibli",u:"https://kankanindy.com/events/ponyo2008/",ds:["2026-07-24","2026-07-26"],st:{"07-24":"7:00 PM","07-26":"1:30 PM"}},
+{th:"kk",tag:"new",t:"Her Private Hell",y:2026,d:"Nicolas Winding Refn",c:"—",a:"Cannes 2026 world premiere",n:"Neon release; sci-fi horror riff on the 1968 title",u:"https://kankanindy.com/events/herprivatehell/",r:["2026-07-24","2026-07-30"],tt:"Multiple showtimes daily — see site"},
+{th:"kk",tag:"rep",t:"Lost Highway",y:1997,d:"David Lynch",c:"Bill Pullman, Patricia Arquette",a:"",n:"David Lynch Directs series",u:"https://kankanindy.com/events/losthighway1997/",ds:["2026-07-25","2026-07-28"],st:{"07-25":"7:00 PM","07-28":"5:20 PM"}},
+{th:"kk",tag:"rep",t:"Battle Beyond the Stars",y:1980,d:"Jimmy T. Murakami",c:"Richard Thomas, George Peppard, John Saxon",a:"",n:"A/V Club; Corman's Star Wars answer, early James Cameron FX",u:"https://kankanindy.com/events/battlebeyondthestars/",ds:["2026-07-27"],st:{"07-27":"8:00 PM"}},
+{th:"kk",tag:"new",t:"Above the Line (w/ Q&A)",y:2026,d:"Jeffrey Scott Collins",c:"Jordan Claire Robbins, Dylan Playfair",a:"",n:"Post-film filmmaker Q&A",u:"https://kankanindy.com/events/abovetheline/",ds:["2026-07-27"],st:{"07-27":"7:00 PM"}},
+{th:"kk",tag:"rep",t:"Batman & Robin (VHS)",y:1997,d:"Joel Schumacher",c:"George Clooney, Arnold Schwarzenegger, Uma Thurman",a:"",n:"Big Screen VHS series; 11 Razzie nominations",u:"https://kankanindy.com/events/batmanrobin1997/",ds:["2026-07-29"],st:{"07-29":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Dirty Dancing",y:1987,d:"Emile Ardolino",c:"Jennifer Grey, Patrick Swayze",a:"Oscar: Best Original Song",n:"",u:"https://kankanindy.com/events/dirtydancing1987/",ds:["2026-07-30"],st:{"07-30":"7:45 PM"}},
+{th:"kk",tag:"rep",t:"Network (4K)",y:1976,d:"Sidney Lumet",c:"Faye Dunaway, Peter Finch, William Holden",a:"4 Oscars incl. 3 acting wins",n:"50th-anniversary 4K restoration",u:"https://kankanindy.com/events/network1976/",ds:["2026-07-30"],st:{"07-30":"5:45 PM"}},
+{th:"kk",tag:"new",t:"I Want Your Sex",y:2026,d:"Gregg Araki",c:"Olivia Wilde, Cooper Hoffman, Charli XCX",a:"Sundance 2026 premiere",n:"",u:"https://kankanindy.com/events/iwantyoursex/",ds:["2026-07-31","2026-08-01","2026-08-02","2026-08-03"],st:{"07-31":"12:35/2:20/5:00/7:00/10:30 PM","08-01":"1:30/4:00/6:00/8:00/10:00 PM","08-02":"12:00/3:40/5:40/7:50 PM","08-03":"5:45/8:15 PM"}},
+{th:"kk",tag:"rep",t:"Muppet Treasure Island",y:1996,d:"Brian Henson",c:"Tim Curry",a:"",n:"Fam-Fam series",u:"https://kankanindy.com/events/muppettreasureisland1996/",ds:["2026-08-01","2026-08-02"],st:{"08-01":"6:00 PM","08-02":"1:30 PM"}},
+{th:"kk",tag:"rep",t:"Girl",y:1998,d:"Jonathan Kahn",c:"Dominique Swain, Sean Patrick Flanery",a:"",n:"A/V Club",u:"https://kankanindy.com/events/girl1998/",ds:["2026-08-03"],st:{"08-03":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Saturday Night Fever",y:1977,d:"John Badham",c:"John Travolta, Karen Lynn Gorney",a:"Oscar nom: Best Actor (Travolta)",n:"",u:"https://kankanindy.com/events/saturdaynightfever1977/",ds:["2026-08-06"],st:{"08-06":"7:45 PM"}},
+{th:"kk",tag:"rep",t:"The Birdcage (outdoor)",y:1996,d:"Mike Nichols",c:"Robin Williams, Nathan Lane, Gene Hackman",a:"SAG: Best Ensemble",n:"At the Indianapolis Art Center",u:"https://kankanindy.com/events/thebirdcageoutdoor/",ds:["2026-08-06"],st:{"08-06":"8:00 PM"}},
+{th:"kk",tag:"new",t:"CatVideoFest 2026",y:2026,d:"Will Braden (curator)",c:"Cats",a:"",n:"Proceeds support shelters",u:"https://kankanindy.com/events/catvideofest2026/",r:["2026-08-07","2026-08-13"],tt:"Daily — see site for times"},
+{th:"kk",tag:"rep",t:"The Straight Story",y:1999,d:"David Lynch",c:"Richard Farnsworth, Sissy Spacek",a:"Cannes 1999 Competition · Oscar nom",n:"David Lynch Directs series",u:"https://kankanindy.com/events/thestraightstory1999/",ds:["2026-08-08","2026-08-12"],st:{"08-08":"5:30 PM","08-12":"7:30 PM"}},
+{th:"kk",tag:"rep",t:"Marcel the Shell with Shoes On",y:2021,d:"Dean Fleischer Camp",c:"Jenny Slate, Isabella Rossellini",a:"Oscar nom: Best Animated Feature",n:"",u:"https://kankanindy.com/events/marceltheshellwithshoeson2021/",ds:["2026-08-09","2026-08-11"],st:{"08-09":"1:00 PM","08-11":"6:00 PM"}},
+{th:"kk",tag:"rep",t:"Breakfast at Tiffany's",y:1961,d:"Blake Edwards",c:"Audrey Hepburn, George Peppard",a:"2 Oscars ('Moon River' + score)",n:"Book to Film Club",u:"https://kankanindy.com/events/breakfastattiffanys1961/",ds:["2026-08-09"],st:{"08-09":"4:00 PM"}},
+{th:"kk",tag:"rep",t:"Teenage Gang Debs",y:1966,d:"Sande Johnsen",c:"Diane Conti",a:"",n:"A/V Club Special w/ Dylan Roahrig",u:"https://kankanindy.com/events/teenagegangdebs1966/",ds:["2026-08-10"],st:{"08-10":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Monterey Pop",y:1968,d:"D.A. Pennebaker",c:"Jimi Hendrix, Janis Joplin, Otis Redding",a:"",n:"Landmark concert documentary",u:"https://kankanindy.com/events/montereypop1968/",ds:["2026-08-13"],st:{"08-13":"7:45 PM"}},
+{th:"kk",tag:"rep",t:"The Sandlot",y:1993,d:"David Mickey Evans",c:"Tom Guiry, Mike Vitar, James Earl Jones",a:"",n:"Library Weekend",u:"https://kankanindy.com/events/thesandlot1993/",ds:["2026-08-15"],st:{"08-15":"5:30 PM"}},
+{th:"kk",tag:"rep",t:"Hello Mary Lou: Prom Night II",y:1987,d:"Bruce Pittman",c:"Michael Ironside, Wendy Lyon",a:"",n:"With Vanity Rex",u:"https://kankanindy.com/events/hellomaryloupromnightii1987/",ds:["2026-08-15"],st:{"08-15":"10:00 PM"}},
+{th:"kk",tag:"rep",t:"Waiting for Guffman",y:1996,d:"Christopher Guest",c:"Christopher Guest, Eugene Levy, Catherine O'Hara",a:"",n:"Library Weekend",u:"https://kankanindy.com/events/waitingforguffman1996/",ds:["2026-08-16"],st:{"08-16":"7:00 PM"}},
+{th:"kk",tag:"rep",t:"Summer School Teachers",y:1975,d:"Barbara Peeters",c:"Candice Rialson",a:"",n:"A/V Club; Corman-produced",u:"https://kankanindy.com/events/summerschoolteachers/",ds:["2026-08-17"],st:{"08-17":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Mamma Mia! Here We Go Again",y:2018,d:"Ol Parker",c:"Lily James, Amanda Seyfried, Meryl Streep, Cher",a:"",n:"",u:"https://kankanindy.com/events/mammamiaherewegoagain2018/",ds:["2026-08-20"],st:{"08-20":"7:45 PM"}},
+{th:"kk",tag:"new",t:"TONY",y:2026,d:"Matt Johnson",c:"Dominic Sessa, Emilia Jones, Leo Woodall, Antonio Banderas",a:"",n:"Young Anthony Bourdain origin story",u:"https://kankanindy.com/events/tony/",ds:["2026-08-21"],st:{"08-21":"TBA"}},
+{th:"kk",tag:"rep",t:"Sleepaway Camp",y:1983,d:"Robert Hiltzik",c:"Felissa Rose",a:"",n:"Summer Camp series",u:"https://kankanindy.com/events/sleepawaycamp1983/",ds:["2026-08-21","2026-08-25"],st:{"08-21":"10:10 PM","08-25":"8:10 PM"}},
+{th:"kk",tag:"new",t:"Teenage Sex and Death at Camp Miasma",y:2026,d:"Jane Schoenbrun",c:"—",a:"Cannes 2026 Un Certain Regard opener · Queer Palm",n:"",u:"https://kankanindy.com/events/teenagesexanddeathatcampmiasma/",ds:["2026-08-21"],st:{"08-21":"TBA"}},
+{th:"kk",tag:"rep",t:"Drive-In Massacre",y:1976,d:"Stu Segall",c:"John F. Goff",a:"",n:"A/V Club",u:"https://kankanindy.com/events/drive-inmassacre/",ds:["2026-08-24"],st:{"08-24":"8:00 PM"}},
+{th:"kk",tag:"new",t:"Honeyjoon",y:2025,d:"Lilian T. Mehrel",c:"Ayden Mayeri, Amira Casar, José Condessa",a:"Tribeca 2025 · AT&T Untold Stories Award",n:"",u:"https://kankanindy.com/events/honeyjoon/",ds:["2026-08-24"],st:{"08-24":"6:30 PM"}},
+{th:"kk",tag:"rep",t:"Wild Wild West (VHS)",y:1999,d:"Barry Sonnenfeld",c:"Will Smith, Kevin Kline, Salma Hayek",a:"",n:"Big Screen VHS; Razzie Worst Picture",u:"https://kankanindy.com/events/wildwildwest1999/",ds:["2026-08-26"],st:{"08-26":"7:45 PM"}},
+{th:"kk",tag:"rep",t:"Crazy Rich Asians (outdoor)",y:2018,d:"Jon M. Chu",c:"Constance Wu, Henry Golding, Michelle Yeoh",a:"",n:"At 10 East Arts",u:"https://kankanindy.com/events/crazyrichasians2018/",ds:["2026-08-28"],st:{"08-28":"7:15 PM"}},
+{th:"kk",tag:"new",t:"Piggy Duster (Indy premiere)",y:2026,d:"Jesse Stewart",c:"Julia Ma, Brian Landis Folkins, Juliette Leong",a:"",n:"Red-carpet premiere + filmmaker Q&A",u:"https://kankanindy.com/events/piggydusterindianapolispremiere/",ds:["2026-08-29","2026-08-30"],st:{"08-29":"7:00 PM","08-30":"3:00 PM"}},
+{th:"kk",tag:"rep",t:"The Edge (w/ Stargaze)",y:0,d:"—",c:"—",a:"",n:"Community screening with Stargaze on Boulevard",u:"https://kankanindy.com/events/theedgescreening/",ds:["2026-08-30"],st:{"08-30":"5:30 PM"}},
+{th:"kk",tag:"rep",t:"Massacre at Central High",y:1976,d:"Rene Daalder",c:"Derrel Maury, Andrew Stevens",a:"",n:"A/V Club",u:"https://kankanindy.com/events/massacreatcentralhigh/",ds:["2026-08-31"],st:{"08-31":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Fallen Angels",y:1995,d:"Wong Kar-wai",c:"Leon Lai, Takeshi Kaneshiro, Michelle Reis",a:"HK Film Awards: cinematography, score",n:"",u:"https://kankanindy.com/events/fallenangels1995/",ds:["2026-08-31"],st:{"08-31":"8:15 PM"}},
+{th:"kk",tag:"rep",t:"The Fox and the Hound",y:1981,d:"Berman, Rich & Stevens",c:"Mickey Rooney, Kurt Russell (voices)",a:"",n:"Fam-Fam series",u:"https://kankanindy.com/events/thefoxandthehound1981/",ds:["2026-09-05","2026-09-06"],st:{"09-05":"6:00 PM","09-06":"1:30 PM"}},
+{th:"kk",tag:"rep",t:"The Curious Dr. Humpp",y:1969,d:"Emilio Vieyra",c:"Ricardo Bauleo",a:"",n:"A/V Club Special w/ Dylan Roahrig",u:"https://kankanindy.com/events/thecuriousdrhumpp1969/",ds:["2026-09-07"],st:{"09-07":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Legally Blonde (outdoor)",y:2001,d:"Robert Luketic",c:"Reese Witherspoon, Luke Wilson",a:"",n:"At the Indianapolis Art Center",u:"https://kankanindy.com/events/legallyblondeoutdoor/",ds:["2026-09-10"],st:{"09-10":"7:00 PM"}},
+{th:"kk",tag:"rep",t:"Everything Everywhere All at Once",y:2022,d:"Daniels",c:"Michelle Yeoh, Ke Huy Quan, Jamie Lee Curtis",a:"7 Oscars incl. Best Picture",n:"",u:"https://kankanindy.com/events/everythingeverywhereallatonce2022/",ds:["2026-09-11"],st:{"09-11":"6:15 PM"}},
+{th:"kk",tag:"rep",t:"The Illustrated Man",y:1969,d:"Jack Smight",c:"Rod Steiger, Claire Bloom",a:"",n:"Book to Film Club w/ Ray Bradbury Center",u:"https://kankanindy.com/events/theillustratedman1969/",ds:["2026-09-13"],st:{"09-13":"4:00 PM"}},
+{th:"kk",tag:"new",t:"Learning Hungry",y:2025,d:"—",c:"—",a:"",n:"Documentary on campus food insecurity + conversation",u:"https://kankanindy.com/events/hungrytolearn/",ds:["2026-09-15"],st:{"09-15":"7:00 PM"}},
+{th:"kk",tag:"new",t:"Withdrawal (w/ Q&A)",y:2025,d:"Aaron Strand",c:"—",a:"",n:"Q&A with writer/director",u:"https://kankanindy.com/events/withdrawalqawithwriterdirectoraaronstrand/",ds:["2026-09-16"],st:{"09-16":"7:30 PM"}},
+{th:"kk",tag:"rep",t:"Valley of the Dolls",y:1967,d:"Mark Robson",c:"Patty Duke, Barbara Parkins, Sharon Tate",a:"Oscar nom: score",n:"With Vanity Rex",u:"https://kankanindy.com/events/valleyofthedolls1967/",ds:["2026-09-19"],st:{"09-19":"9:00 PM"}},
+{th:"kk",tag:"rep",t:"Mulholland Drive",y:2001,d:"David Lynch",c:"Naomi Watts, Laura Harring, Justin Theroux",a:"Cannes Best Director · Oscar nom",n:"David Lynch Directs series",u:"https://kankanindy.com/events/mulhollanddrive2001/",ds:["2026-09-20"],st:{"09-20":"7:30 PM"}},
+{th:"kk",tag:"rep",t:"Fast Color (outdoor)",y:2018,d:"Julia Hart",c:"Gugu Mbatha-Raw, Lorraine Toussaint",a:"SXSW 2018",n:"At 10 East Arts",u:"https://kankanindy.com/events/fastcolor2018/",ds:["2026-09-25"],st:{"09-25":"6:30 PM"}},
+{th:"kk",tag:"new",t:"Necessary Allies (encore)",y:2026,d:"—",c:"—",a:"",n:"Local documentary, encore screening",u:"https://kankanindy.com/events/necessaryalliesencorescreening/",ds:["2026-09-26"],st:{"09-26":"1:30 PM"}},
+{th:"kk",tag:"new",t:"Bunker Heights (w/ Q&A)",y:2026,d:"Drew Fortier",c:"Drew Fortier, Hannah Fierman, Chaney Morrow",a:"",n:"Q&A with director & cast",u:"https://kankanindy.com/events/bunkerheights/",ds:["2026-09-29"],st:{"09-29":"7:00 PM"}},
+{th:"kk",tag:"rep",t:"Blade (VHS)",y:1998,d:"Stephen Norrington",c:"Wesley Snipes, Stephen Dorff, Kris Kristofferson",a:"",n:"Big Screen VHS series",u:"https://kankanindy.com/events/blade1998/",ds:["2026-09-30"],st:{"09-30":"7:45 PM"}},
+{th:"kk",tag:"rep",t:"Corpse Bride",y:2005,d:"Tim Burton & Mike Johnson",c:"Johnny Depp, Helena Bonham Carter (voices)",a:"Oscar nom: Best Animated Feature",n:"Fam-Fam series",u:"https://kankanindy.com/events/corpsebride2005/",ds:["2026-10-03","2026-10-04"],st:{"10-03":"6:00 PM","10-04":"1:30 PM"}},
+{th:"kk",tag:"rep",t:"The French Dispatch",y:2021,d:"Wes Anderson",c:"Benicio del Toro, Frances McDormand, Timothée Chalamet",a:"Cannes 2021 Competition",n:"",u:"https://kankanindy.com/events/thefrenchdispatch2021/",ds:["2026-10-06"],st:{"10-06":"7:45 PM"}},
+{th:"kk",tag:"new",t:"Mother (world premiere)",y:2026,d:"Justin Sutton",c:"—",a:"",n:"Indianapolis-made indie horror; intro from the production team",u:"https://kankanindy.com/events/mother/",ds:["2026-10-10"],st:{"10-10":"5:30 PM"}},
+{th:"kk",tag:"rep",t:"Room",y:2015,d:"Lenny Abrahamson",c:"Brie Larson, Jacob Tremblay",a:"Oscar Best Actress · TIFF People's Choice",n:"Book to Film Club",u:"https://kankanindy.com/events/room2015/",ds:["2026-10-11"],st:{"10-11":"4:00 PM"}},
+{th:"kk",tag:"rep",t:"Hack-O-Lantern",y:1988,d:"Jag Mundhra",c:"Hy Pyke",a:"",n:"A/V Club Special w/ Dylan Roahrig",u:"https://kankanindy.com/events/hack-o-lantern1988/",ds:["2026-10-12"],st:{"10-12":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Faust (100th, live score)",y:1926,d:"F.W. Murnau",c:"Emil Jannings, Gösta Ekman",a:"",n:"Silent masterpiece with live musical accompaniment",u:"https://kankanindy.com/events/faust1926/",ds:["2026-10-19"],st:{"10-19":"7:30 PM"}},
+{th:"kk",tag:"rep",t:"Ghostbusters (outdoor)",y:1984,d:"Ivan Reitman",c:"Bill Murray, Dan Aykroyd, Sigourney Weaver",a:"2 Oscar noms",n:"At the Indianapolis Art Center",u:"https://kankanindy.com/events/ghostbustersoutdoor/",ds:["2026-10-22"],st:{"10-22":"6:00 PM"}},
+{th:"kk",tag:"rep",t:"What Ever Happened to Baby Jane?",y:1962,d:"Robert Aldrich",c:"Bette Davis, Joan Crawford",a:"Oscar: costume design",n:"With Vanity Rex",u:"https://kankanindy.com/events/whateverhappenedtobabyjane1962/",ds:["2026-10-24"],st:{"10-24":"9:00 PM"}},
+{th:"kk",tag:"rep",t:"Twin Peaks: Fire Walk with Me",y:1992,d:"David Lynch",c:"Sheryl Lee, Ray Wise",a:"Cannes 1992 Competition",n:"With commentary from Bunny Beaumont",u:"https://kankanindy.com/events/twinpeaksfirewalkwithme1992/",ds:["2026-10-25"],st:{"10-25":"7:45 PM"}},
+{th:"kk",tag:"rep",t:"The Blair Witch Project (VHS)",y:1999,d:"Myrick & Sánchez",c:"Heather Donahue",a:"Cannes 1999 Prix de la Jeunesse",n:"Big Screen VHS series",u:"https://kankanindy.com/events/theblairwitchproject1999/",ds:["2026-10-30"],st:{"10-30":"10:00 PM"}},
+{th:"kk",tag:"rep",t:"Autumn Sonata",y:1978,d:"Ingmar Bergman",c:"Ingrid Bergman, Liv Ullmann",a:"Oscar nom: Best Actress",n:"",u:"https://kankanindy.com/events/autumnsonata1978/",ds:["2026-11-01","2026-11-03"],st:{"11-01":"11:30 AM","11-03":"7:30 PM"}},
+{th:"kk",tag:"rep",t:"The Lion King",y:1994,d:"Allers & Minkoff",c:"Matthew Broderick, James Earl Jones (voices)",a:"2 Oscars (score + song)",n:"Fam-Fam series",u:"https://kankanindy.com/events/thelionking1994/",ds:["2026-11-07","2026-11-08"],st:{"11-07":"6:00 PM","11-08":"1:30 PM"}},
+{th:"kk",tag:"rep",t:"The Perks of Being a Wallflower",y:2012,d:"Stephen Chbosky",c:"Logan Lerman, Emma Watson, Ezra Miller",a:"",n:"Book to Film Club",u:"https://kankanindy.com/events/theperksofbeingawallflower2012/",ds:["2026-11-08"],st:{"11-08":"4:00 PM"}},
+{th:"kk",tag:"rep",t:"Tromeo and Juliet",y:1996,d:"Lloyd Kaufman",c:"Jane Jensen; narrated by Lemmy",a:"",n:"A/V Club Special; Troma cult classic",u:"https://kankanindy.com/events/tromeoandjuliet1996/",ds:["2026-11-09"],st:{"11-09":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"The Boy and the Heron",y:2023,d:"Hayao Miyazaki",c:"Christian Bale, Florence Pugh (EN voices)",a:"Oscar Best Animated Feature · Golden Globe",n:"",u:"https://kankanindy.com/events/theboyandtheheron2023/",ds:["2026-11-17"],st:{"11-17":"7:30 PM"}},
+{th:"kk",tag:"rep",t:"Inland Empire",y:2006,d:"David Lynch",c:"Laura Dern, Jeremy Irons",a:"",n:"David Lynch Directs series",u:"https://kankanindy.com/events/inlandempire2006/",ds:["2026-11-20"],st:{"11-20":"6:00 PM"}},
+{th:"kk",tag:"rep",t:"Final Destination 2",y:2003,d:"David R. Ellis",c:"Ali Larter, A.J. Cook",a:"",n:"With Vanity Rex",u:"https://kankanindy.com/events/finaldestination22003/",ds:["2026-11-21"],st:{"11-21":"9:00 PM"}},
+{th:"kk",tag:"rep",t:"Planes, Trains & Automobiles (VHS)",y:1987,d:"John Hughes",c:"Steve Martin, John Candy",a:"",n:"Big Screen VHS series",u:"https://kankanindy.com/events/planestrainsautomobiles1987/",ds:["2026-11-25"],st:{"11-25":"7:30 PM"}},
+{th:"kk",tag:"rep",t:"The Muppet Christmas Carol",y:1992,d:"Brian Henson",c:"Michael Caine",a:"",n:"Fam-Fam series",u:"https://kankanindy.com/events/themuppetchristmascarol1992famfam/",ds:["2026-12-05","2026-12-06"],st:{"12-05":"6:00 PM","12-06":"1:30 PM"}},
+{th:"kk",tag:"rep",t:"Nickel Boys",y:2024,d:"RaMell Ross",c:"Ethan Herisse, Brandon Wilson, Aunjanue Ellis-Taylor",a:"2 Oscar noms incl. Best Picture",n:"Book to Film Club",u:"https://kankanindy.com/events/nickelboys2024/",ds:["2026-12-13"],st:{"12-13":"4:00 PM"}},
+{th:"kk",tag:"rep",t:"Evil Dead II",y:1987,d:"Sam Raimi",c:"Bruce Campbell",a:"",n:"A/V Club Special w/ Dylan Roahrig",u:"https://kankanindy.com/events/evildeadii1987/",ds:["2026-12-14"],st:{"12-14":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Poor Things",y:2023,d:"Yorgos Lanthimos",c:"Emma Stone, Mark Ruffalo, Willem Dafoe",a:"Venice Golden Lion · 4 Oscars",n:"",u:"https://kankanindy.com/events/poorthings2023/",ds:["2026-12-15"],st:{"12-15":"8:00 PM"}},
+{th:"kk",tag:"rep",t:"Misery (VHS)",y:1990,d:"Rob Reiner",c:"James Caan, Kathy Bates",a:"Oscar Best Actress (Bates)",n:"Big Screen VHS series",u:"https://kankanindy.com/events/misery1990/",ds:["2026-12-23"],st:{"12-23":"7:45 PM"}}
+];
+
+// ── state ──
+let fTheatre = localStorage.getItem('iac-th') || 'all';
+let fNew = localStorage.getItem('iac-new') === '1';
+let selDirs = new Set(JSON.parse(localStorage.getItem('iac-dirs')||'[]'));
+let selAw = new Set(JSON.parse(localStorage.getItem('iac-aw')||'[]'));
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+// ── director index (built dynamically from the data) ──
+function dirTokens(f){
+  if (!f.d || f.d==='—') return [];
+  return f.d.split(/\s*&\s*|\s*,\s*/).map(s=>s.trim()).filter(s=>s && s!=='—');
+}
+const DIRS = (()=>{ const m={}; FILMS.forEach(f=>dirTokens(f).forEach(d=>m[d]=(m[d]||0)+1)); return Object.entries(m).sort((a,b)=>a[0].localeCompare(b[0])); })();
+
+// ── award facets (only facets present in the data appear) ──
+const FACETS = [
+  ['Oscar winner', a=>/oscar(?!\s*nom)/i.test(a)],
+  ['Oscar nominee', a=>/oscar nom/i.test(a)],
+  ['Palme d\'Or', a=>/palme/i.test(a)],
+  ['Cannes', a=>/cannes|palme|queer palm/i.test(a)],
+  ['Venice', a=>/venice|golden lion/i.test(a)],
+  ['Berlin', a=>/berlin|golden bear/i.test(a)],
+  ['Sundance', a=>/sundance/i.test(a)],
+  ['Tribeca', a=>/tribeca/i.test(a)],
+  ['SXSW', a=>/sxsw/i.test(a)],
+  ['Golden Globe', a=>/golden globe/i.test(a)],
+  ['Annecy / César', a=>/annecy|césar/i.test(a)],
+  ['Any award / festival', a=>!!a]
+].filter(([,fn])=>FILMS.some(f=>f.a&&fn(f.a)));
+function dates(f){
+  if (f.ds) return f.ds;
+  if (f.r) { const out=[]; let d=new Date(f.r[0]+'T12:00:00'); const end=new Date(f.r[1]+'T12:00:00'); while(d<=end){ out.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1);} return out; }
+  return [];
+}
+function timeFor(f, iso){
+  if (f.st && f.st[iso.slice(5)]) return f.st[iso.slice(5)];
+  return null;
+}
+function passes(f, q){
+  if (fTheatre!=='all' && f.th!==fTheatre) return false;
+  if (fNew && f.tag!=='new' && !f.fresh) return false;
+  if (selDirs.size && !dirTokens(f).some(d=>selDirs.has(d))) return false;
+  if (selAw.size){
+    const hit = FACETS.some(([name,fn])=>selAw.has(name) && f.a && fn(f.a));
+    if (!hit) return false;
+  }
+  if (q && ![f.t,f.d,f.c,f.a,f.n,String(f.y)].join(' ').toLowerCase().includes(q)) return false;
+  return true;
+}
+function buildIndex(){
+  const map = {};
+  FILMS.forEach((f,i)=>dates(f).forEach(d=>{ (map[d]=map[d]||[]).push(i); }));
+  return map;
+}
+
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+let dayMap = buildIndex();
+let monthKeys = [...new Set(Object.keys(dayMap).map(d=>d.slice(0,7)))].sort();
+let curMonth = (()=>{ const now=new Date().toISOString().slice(0,7);
+  if (monthKeys.includes(now)) return now;
+  const later = monthKeys.find(k=>k>now); return later || monthKeys[monthKeys.length-1] || now; })();
+
+document.getElementById('dows').innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="dow">${d}</div>`).join('');
+
+function renderCal(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const [y,m] = curMonth.split('-').map(Number);
+  const nDays = new Date(y, m, 0).getDate();
+  const startDow = new Date(y, m-1, 1).getDay();
+  const today = new Date().toISOString().slice(0,10);
+  let cells = '';
+  for (let i=0;i<startDow;i++) cells += '<div class="day blank"></div>';
+  const filteringNow = selDirs.size||selAw.size||q||fNew||fTheatre!=='all';
+  for (let d=1; d<=nDays; d++){
+    const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const idxs = dayMap[iso]||[];
+    // matches first, so a hit is always visible without scrolling the cell
+    const ordered = idxs.map(i=>[i, passes(FILMS[i],q)]).sort((a,b)=>b[1]-a[1]);
+    const hasHit = ordered.some(([,ok])=>ok);
+    let evs = '';
+    ordered.forEach(([i,ok])=>{
+      const f = FILMS[i];
+      const tm = timeFor(f, iso);
+      const tShort = tm && tm.split('/').length===1 ? tm.replace(':00','').replace(' ','') : null;
+      evs += `<button class="ev ${f.th}${f.tag==='new'||f.fresh?' new':''}${ok?'':' dim'}" data-i="${i}" title="${esc(f.t)}${tm?' — '+esc(tm):''}${f.a?' — '+esc(f.a):''}">${f.a?'<span class="star">★</span>':''}${tShort?`<span class="tm">${esc(tShort)}</span> `:''} ${esc(f.t)}</button>`;
+    });
+    cells += `<div class="day${iso===today?' today':''}${filteringNow&&hasHit?' hit':''}"><div class="dnum">${d}</div>${evs}</div>`;
+  }
+  document.getElementById('grid').innerHTML = cells;
+  // if filters hide everything this month, point to months that do have matches
+  let title = MONTHS[m-1]+' '+y;
+  const filtering = selDirs.size||selAw.size||q||fNew||fTheatre!=='all';
+  if (filtering){
+    const visHere = (dayMap && Object.keys(dayMap).some(d=>d.startsWith(curMonth) && dayMap[d].some(i=>passes(FILMS[i],q))));
+    if (!visHere){
+      const hits = [...new Set(Object.keys(dayMap).filter(d=>dayMap[d].some(i=>passes(FILMS[i],q))).map(d=>d.slice(0,7)))].sort();
+      title += hits.length ? ' · matches: '+hits.map(k=>MONTHS[+k.slice(5)-1].slice(0,3)).join(', ') : ' · no matches';
+    }
+  }
+  document.getElementById('mtitle').textContent = title;
+  const mi = monthKeys.indexOf(curMonth);
+  document.getElementById('prev').disabled = mi<=0;
+  document.getElementById('next').disabled = mi<0 || mi>=monthKeys.length-1;
+  document.querySelectorAll('.fchip').forEach(ch=>ch.classList.toggle('on', ch.dataset.f===fTheatre));
+  document.getElementById('newOnly').classList.toggle('on', fNew);
+  document.getElementById('dirBtn').innerHTML = 'Directors ▾' + (selDirs.size?` <span class="n">${selDirs.size}</span>`:'');
+  document.getElementById('dirBtn').classList.toggle('on', selDirs.size>0);
+  document.getElementById('awBtn').innerHTML = '★ Awards ▾' + (selAw.size?` <span class="n">${selAw.size}</span>`:'');
+  document.getElementById('awBtn').classList.toggle('on', selAw.size>0);
+}
+
+// ── filter panels ──
+function renderDirList(){
+  const q = (document.getElementById('dirQ').value||'').toLowerCase();
+  document.getElementById('dirList').innerHTML = DIRS
+    .filter(([d])=>!q || d.toLowerCase().includes(q))
+    .map(([d,c])=>`<label><input type="checkbox" data-d="${esc(d)}" ${selDirs.has(d)?'checked':''}> ${esc(d)} <span class="cnt">${c}</span></label>`).join('')
+    || '<label style="color:var(--muted)">No matches</label>';
+}
+function renderAwList(){
+  document.getElementById('awList').innerHTML = FACETS
+    .map(([name,fn])=>{ const c=FILMS.filter(f=>f.a&&fn(f.a)).length;
+      return `<label><input type="checkbox" data-a="${esc(name)}" ${selAw.has(name)?'checked':''}> ${esc(name)} <span class="cnt">${c}</span></label>`; }).join('');
+}
+document.getElementById('dirList').addEventListener('change', e=>{
+  const d=e.target.dataset.d; if(!d) return;
+  e.target.checked ? selDirs.add(d) : selDirs.delete(d);
+  localStorage.setItem('iac-dirs', JSON.stringify([...selDirs])); renderCal();
+});
+document.getElementById('awList').addEventListener('change', e=>{
+  const a=e.target.dataset.a; if(!a) return;
+  e.target.checked ? selAw.add(a) : selAw.delete(a);
+  localStorage.setItem('iac-aw', JSON.stringify([...selAw])); renderCal();
+});
+document.getElementById('dirQ').addEventListener('input', renderDirList);
+document.getElementById('dirClear').addEventListener('click', ()=>{ selDirs.clear(); localStorage.setItem('iac-dirs','[]'); renderDirList(); renderCal(); });
+document.getElementById('awClear').addEventListener('click', ()=>{ selAw.clear(); localStorage.setItem('iac-aw','[]'); renderAwList(); renderCal(); });
+document.getElementById('dirBtn').addEventListener('click', ()=>{ document.getElementById('awDrop').classList.remove('open'); document.getElementById('dirDrop').classList.toggle('open'); });
+document.getElementById('awBtn').addEventListener('click', ()=>{ document.getElementById('dirDrop').classList.remove('open'); document.getElementById('awDrop').classList.toggle('open'); });
+document.addEventListener('click', e=>{ if(!e.target.closest('.drop')) document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open')); });
+renderDirList(); renderAwList();
+
+// modal
+const ovl = document.getElementById('ovl'), modal = document.getElementById('modal');
+document.getElementById('grid').addEventListener('click', e=>{
+  const b = e.target.closest('.ev'); if(!b) return;
+  const f = FILMS[+b.dataset.i];
+  const thName = f.th==='dh' ? 'Alamo Drafthouse' : 'Kan-Kan Cinema';
+  let sched = '';
+  if (f.tt) sched = esc(f.tt) + (f.r ? ` (${fmt(f.r[0])} – ${fmt(f.r[1])})` : '');
+  else if (f.st) sched = '<span class="stimes">'+dates(f).map(d=>`<div>${fmt(d)} · ${esc(f.st[d.slice(5)]||'')}</div>`).join('')+'</span>';
+  else sched = dates(f).map(fmt).join(', ');
+  modal.innerHTML = `<button class="close">×</button>
+    <div class="mtag ${f.th}">${thName}${f.tag==='new'||f.fresh?' · NEW RELEASE':''}</div>
+    <h3>${esc(f.t)}</h3><div class="my">${f.y||''}</div>
+    <dl>
+      ${f.a?`<dt>Award</dt><dd class="maward">★ ${esc(f.a)}</dd>`:''}
+      <dt>Director</dt><dd>${esc(f.d||'—')}</dd>
+      <dt>Cast</dt><dd>${esc(f.c||'—')}</dd>
+      ${f.n?`<dt>Notes</dt><dd>${esc(f.n)}</dd>`:''}
+      <dt>Showtimes</dt><dd>${sched}</dd>
+    </dl>
+    <a class="btn" href="${f.u}" target="_blank">Theatre page ↗</a>`;
+  ovl.classList.add('open');
+});
+function fmt(iso){ const d=new Date(iso+'T12:00:00'); return MONTHS[d.getMonth()].slice(0,3)+' '+d.getDate(); }
+ovl.addEventListener('click', e=>{ if(e.target===ovl || e.target.classList.contains('close')) ovl.classList.remove('open'); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') ovl.classList.remove('open'); });
+
+// controls
+document.getElementById('upd').textContent = UPDATED;
+document.getElementById('q').addEventListener('input', renderCal);
+document.querySelectorAll('.fchip').forEach(ch=>ch.addEventListener('click', ()=>{ fTheatre=ch.dataset.f; localStorage.setItem('iac-th',fTheatre); renderCal(); }));
+document.getElementById('newOnly').addEventListener('click', ()=>{ fNew=!fNew; localStorage.setItem('iac-new',fNew?'1':'0'); renderCal(); });
+document.getElementById('prev').addEventListener('click', ()=>{ const i=monthKeys.indexOf(curMonth); if(i>0){curMonth=monthKeys[i-1]; renderCal();} });
+document.getElementById('next').addEventListener('click', ()=>{ const i=monthKeys.indexOf(curMonth); if(i<monthKeys.length-1){curMonth=monthKeys[i+1]; renderCal();} });
+renderCal();
+
+// Live check (Cowork only; silently skipped in a normal browser): flag Kan-Kan titles added since last daily update.
+(async function liveCheck(){
+  if (!window.cowork || !window.cowork.callMcpTool) return;
+  try {
+    const r = await window.cowork.callMcpTool('mcp__workspace__web_fetch', { url: 'https://kankanindy.com/all-upcoming-films/' });
+    const text = r && r.content && r.content[0] ? r.content[0].text : '';
+    if (!text) return;
+    const re = /\[([^\]\[]{2,90})\]\(https:\/\/kankanindy\.com\/events\/([a-z0-9-]+)\/\)/g;
+    const seen = new Set(FILMS.filter(f=>f.th==='kk').map(f=>f.u.replace(/\/$/,'').split('/').pop()));
+    const skip = new Set(['bartrivia','localfilmmakermixer']);
+    let m; const freshTitles = [];
+    while ((m = re.exec(text)) !== null) {
+      if (seen.has(m[2]) || skip.has(m[2]) || m[1].startsWith('!')) continue;
+      seen.add(m[2]); freshTitles.push(m[1]);
+    }
+    if (freshTitles.length) {
+      const n = document.getElementById('liveNote');
+      n.style.display='block';
+      n.textContent = '● Just appeared on Kan-Kan (details in the next daily update): ' + freshTitles.join(' · ');
+    }
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
