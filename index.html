@@ -70,6 +70,29 @@
   #modal .stimes div { margin-bottom:2px; }
   #modal a.btn { display:inline-block; margin-top:14px; font-size:12.5px; color:#fff; background:var(--ink); padding:6px 15px; border-radius:8px; text-decoration:none; }
   #modal .close { float:right; border:none; background:none; font-size:20px; cursor:pointer; color:var(--muted); }
+  .dfull { display:none; }
+  /* ── mobile: agenda view ── */
+  @media (max-width: 640px) {
+    html,body { height:auto; }
+    body { display:block; padding:12px 10px 40px; overflow-y:auto; }
+    header { display:block; }
+    .legend { margin-top:4px; }
+    .controls { position:sticky; top:0; background:var(--bg); z-index:30; padding:6px 0; }
+    .controls input[type=search] { flex-basis:100%; }
+    .mnav { margin:6px auto 0; width:100%; justify-content:center; }
+    .panel { position:fixed; left:10px; right:10px; top:auto; width:auto; max-width:none; }
+    #calwrap { display:block; }
+    .dows { display:none; }
+    .grid { display:block; height:auto; }
+    .day { min-height:0; overflow:visible; margin-bottom:8px; padding:7px 9px; }
+    .day.blank, .day.empty, .day.nohit { display:none; }
+    .dn { display:none; }
+    .dfull { display:inline; font-weight:700; font-size:13px; color:var(--ink); }
+    .day.hit .dfull { color:var(--gold); }
+    .dnum { margin-bottom:5px; }
+    .ev { font-size:13.5px; padding:7px 9px; margin-bottom:4px; border-radius:7px; }
+    .ev .tm { font-size:12px; }
+  }
 </style>
 </head>
 <body>
@@ -371,7 +394,8 @@ function renderCal(){
       const tShort = tm && tm.split('/').length===1 ? tm.replace(':00','').replace(' ','') : null;
       evs += `<button class="ev ${f.th}${f.tag==='new'||f.fresh?' new':''}${ok?'':' dim'}" data-i="${i}" title="${esc(f.t)}${tm?' — '+esc(tm):''}${f.a?' — '+esc(f.a):''}">${f.a?'<span class="star">★</span>':''}${tShort?`<span class="tm">${esc(tShort)}</span> `:''} ${esc(f.t)}</button>`;
     });
-    cells += `<div class="day${iso===today?' today':''}${filteringNow&&hasHit?' hit':''}"><div class="dnum">${d}</div>${evs}</div>`;
+    const dowS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(iso+'T12:00:00').getDay()];
+    cells += `<div class="day${iso===today?' today':''}${filteringNow&&hasHit?' hit':''}${filteringNow&&!hasHit?' nohit':''}${idxs.length?'':' empty'}"><div class="dnum"><span class="dn">${d}</span><span class="dfull">${dowS}, ${MONTHS[m-1].slice(0,3)} ${d}</span></div>${evs}</div>`;
   }
   document.getElementById('grid').innerHTML = cells;
   // if filters hide everything this month, point to months that do have matches
