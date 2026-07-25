@@ -31,7 +31,8 @@
   .plist label .cnt { margin-left:auto; color:var(--muted); font-size:10.5px; }
   .plist input { accent-color: var(--ink); }
   .pfoot { display:flex; justify-content:space-between; margin-top:6px; }
-  .pfoot button { border:none; background:none; font-size:11.5px; color:var(--dh); cursor:pointer; }
+  .pfoot button { border:none; background:none; font-size:11.5px; color:var(--dh); cursor:pointer; padding:6px 8px; touch-action:manipulation; }
+  .pfoot .pclose { color:#fff; background:var(--ink); border-radius:7px; }
   .mnav { display:flex; align-items:center; gap:10px; margin-left:auto; }
   .mnav button { border:1px solid var(--line); background:var(--card); border-radius:8px; font-size:15px; width:30px; height:28px; cursor:pointer; color:var(--ink); }
   .mnav button:disabled { opacity:.3; cursor:default; }
@@ -80,7 +81,10 @@
     .controls { position:sticky; top:0; background:var(--bg); z-index:30; padding:6px 0; }
     .controls input[type=search] { flex-basis:100%; }
     .mnav { margin:6px auto 0; width:100%; justify-content:center; }
-    .panel { position:fixed; left:10px; right:10px; top:auto; width:auto; max-width:none; }
+    .panel { position:fixed; left:12px; right:12px; top:14vh; width:auto; max-width:none; max-height:64vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.35); z-index:60; }
+    .plist { max-height:44vh; }
+    .plist label { padding:8px 6px; font-size:14px; }
+    .chip { padding:7px 13px; font-size:13px; touch-action:manipulation; }
     #calwrap { display:block; }
     .dows { display:none; }
     .grid { display:block; height:auto; }
@@ -111,16 +115,16 @@
   <span class="chip" id="newOnly">New releases</span>
   <span class="drop" id="dirDrop"><span class="chip" id="dirBtn">Directors ▾</span>
     <div class="panel"><input type="search" id="dirQ" placeholder="Find a director…"><div class="plist" id="dirList"></div>
-    <div class="pfoot"><button id="dirClear">Clear</button></div></div></span>
+    <div class="pfoot"><button id="dirClear">Clear</button><button class="pclose">Done</button></div></div></span>
   <span class="drop" id="awDrop"><span class="chip" id="awBtn">★ Awards ▾</span>
     <div class="panel"><div class="plist" id="awList"></div>
-    <div class="pfoot"><button id="awClear">Clear</button></div></div></span>
+    <div class="pfoot"><button id="awClear">Clear</button><button class="pclose">Done</button></div></div></span>
   <span class="drop" id="decDrop"><span class="chip" id="decBtn">Decade ▾</span>
     <div class="panel"><div class="plist" id="decList"></div>
-    <div class="pfoot"><button id="decClear">Clear</button></div></div></span>
+    <div class="pfoot"><button id="decClear">Clear</button><button class="pclose">Done</button></div></div></span>
   <span class="drop" id="serDrop"><span class="chip" id="serBtn">Series ▾</span>
     <div class="panel"><div class="plist" id="serList"></div>
-    <div class="pfoot"><button id="serClear">Clear</button></div></div></span>
+    <div class="pfoot"><button id="serClear">Clear</button><button class="pclose">Done</button></div></div></span>
   <span class="mnav"><button id="prev">‹</button><h2 id="mtitle"></h2><button id="next">›</button></span>
 </div>
 <div id="liveNote"></div>
@@ -480,6 +484,7 @@ const DROPS=['dirDrop','awDrop','decDrop','serDrop'];
   });
 });
 document.addEventListener('click', e=>{ if(!e.target.closest('.drop')) document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open')); });
+document.querySelectorAll('.pclose').forEach(b=>b.addEventListener('click', ()=>document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open'))));
 renderDirList(); renderAwList(); renderDecList(); renderSerList();
 
 // modal
